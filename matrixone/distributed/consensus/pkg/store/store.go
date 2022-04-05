@@ -2,6 +2,8 @@ package store
 
 import (
 	"github.com/matrixorigin/talent-challenge/matrixbase/distributed/pkg/cfg"
+	"github.com/matrixorigin/talent-challenge/matrixbase/distributed/pkg/store/raftstore"
+	"strings"
 )
 
 // Store the store interface
@@ -21,5 +23,13 @@ func NewStore(cfg cfg.StoreCfg) (Store, error) {
 	}
 
 	// TODO: need to implement
-	return nil, nil
+	dirs := strings.Split(cfg.DataPath, "/")
+	id := nodeMap[dirs[len(dirs)-1]]
+	return raftstore.NewRaftStore(id, cfg.DataPath), nil
+}
+
+var nodeMap = map[string]uint64{
+	"node1": 1,
+	"node2": 2,
+	"node3": 3,
 }

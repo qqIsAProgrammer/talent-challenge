@@ -1,6 +1,6 @@
 [api]
-addr = "node2:8080"
+addr = "127.0.0.1:8081"
 
 [store]
-memory = true
-dataPath = "/tmp"
+memory = false
+dataPath = "/tmp/consensus/node2"
