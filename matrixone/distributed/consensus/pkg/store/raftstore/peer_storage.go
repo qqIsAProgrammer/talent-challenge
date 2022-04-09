@@ -39,7 +39,7 @@ func newPeerStorage(path string) *peerStorage {
 func (ps *peerStorage) InitialState() (raftpb.HardState, raftpb.ConfState, error) {
 	hs := raftpb.HardState{}
 	cs := raftpb.ConfState{}
-	if !isEmptyHardState(*ps.localState.HardState) {
+	if !raft.IsEmptyHardState(*ps.localState.HardState) {
 		hs = *ps.localState.HardState
 	}
 	if !isEmptyConfState(*ps.confState) {
@@ -82,10 +82,6 @@ func (ps *peerStorage) Term(i uint64) (uint64, error) {
 	if err := ps.checkRange(i, i+1); err != nil {
 		return 0, err
 	}
-	//if ps.truncateTerm() == ps.localState.LastTerm ||
-	//	i == ps.localState.LastIndex {
-	//	return ps.localState.LastTerm, nil
-	//}
 	if i == ps.localState.LastIndex {
 		return ps.localState.LastTerm, nil
 	}
@@ -110,7 +106,6 @@ func (ps *peerStorage) FirstIndex() (uint64, error) {
 }
 
 func (ps *peerStorage) Snapshot() (raftpb.Snapshot, error) {
-	logger.Infof("try to generate snapshot")
 	var snapshot raftpb.Snapshot
 	if ps.snapState.StateType == snap.SnapshotGenerating {
 		select {
@@ -122,7 +117,7 @@ func (ps *peerStorage) Snapshot() (raftpb.Snapshot, error) {
 			return snapshot, raft.ErrSnapshotTemporarilyUnavailable
 		}
 		ps.snapState.StateType = snap.SnapshotRelaxed
-		if !isEmptySnapshotMetadata(snapshot.Metadata) {
+		if !raft.IsEmptySnap(snapshot) {
 			ps.snapTriedCnt = 0
 			if ps.snapshotValid(snapshot) {
 				return snapshot, nil
@@ -221,7 +216,6 @@ func (ps *peerStorage) applySnapshot(snapshot raftpb.Snapshot) {
 	ps.snapState.StateType = snap.SnapshotApplying
 	pairs := storage.Decode(snapshot.Data)
 	for _, p := range pairs {
-		logger.Infof("applying %s", p.String())
 		modify := storage.PutData(p.Key, p.Val, true)
 		ps.engines.WriteKV(modify)
 	}
@@ -232,7 +226,7 @@ func (ps *peerStorage) saveReadyState(rd raft.Ready) error {
 		ps.applySnapshot(rd.Snapshot)
 	}
 	ps.truncateAndAppend(rd.Entries)
-	if !isEmptyHardState(rd.HardState) {
+	if !raft.IsEmptyHardState(rd.HardState) {
 		ps.localState.HardState = &rd.HardState
 	}
 	return ps.writeLocalState(ps.localState)
