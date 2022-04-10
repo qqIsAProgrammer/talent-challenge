@@ -46,6 +46,10 @@ func (r *read) key() []byte {
 	return r.ctx[8:]
 }
 
+func (r *read) timestamp() int64 {
+	return int64(binary.LittleEndian.Uint64(r.ctx))
+}
+
 type peer struct {
 	id        uint64
 	raftGroup raft.Node
@@ -297,11 +301,16 @@ func (pr *peer) handleReadState() {
 		select {
 		case <-pr.readStateComing:
 			var r *read
-			for len(pr.readc) > 0 {
+			size := len(pr.readc)
+			for size > 0 {
 				r = <-pr.readc
 				if _, ok := pr.readStateTable[string(r.ctx)]; ok {
 					break
 				}
+				if time.Duration(time.Now().UnixNano()-r.timestamp()) < 15*time.Second {
+					pr.readc <- r
+				}
+				size--
 			}
 			state := pr.readStateTable[string(r.ctx)]
 			delete(pr.readStateTable, string(r.ctx))
